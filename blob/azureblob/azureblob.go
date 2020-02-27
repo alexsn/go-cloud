@@ -690,14 +690,28 @@ func (b *bucket) SignedURL(ctx context.Context, key string, opts *driver.SignedU
 	default:
 		return "", fmt.Errorf("unsupported Method %s", opts.Method)
 	}
-	var err error
-	srcBlobParts.SAS, err = azblob.BlobSASSignatureValues{
+	azVals := &azblob.BlobSASSignatureValues{
 		Protocol:      azblob.SASProtocolHTTPS,
 		ExpiryTime:    time.Now().UTC().Add(opts.Expiry),
 		ContainerName: b.name,
 		BlobName:      srcBlobParts.BlobName,
 		Permissions:   perms.String(),
-	}.NewSASQueryParameters(b.opts.Credential)
+	}
+	if opts.BeforeSign != nil {
+		asFunc := func(i interface{}) bool {
+			p, ok := i.(**azblob.BlobSASSignatureValues)
+			if !ok {
+				return false
+			}
+			*p = azVals
+			return true
+		}
+		if err := opts.BeforeSign(asFunc); err != nil {
+			return "", err
+		}
+	}
+	var err error
+	srcBlobParts.SAS, err = azVals.NewSASQueryParameters(b.opts.Credential)
 	if err != nil {
 		return "", err
 	}

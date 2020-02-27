@@ -330,6 +330,11 @@ type SignedURLOptions struct {
 	//
 	// This field will always be false for non-PUT requests.
 	EnforceAbsentContentType bool
+
+	// BeforeSign is a callback that must be called before initiating the sign operation.
+	// asFunc allows drivers to expose driver-specific types;
+	// see Bucket.As for more details.
+	BeforeSign func(asFunc func(interface{}) bool) error
 }
 
 // prefixedBucket implements Bucket by prepending prefix to all keys.

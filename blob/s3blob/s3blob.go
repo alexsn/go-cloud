@@ -51,6 +51,8 @@
 //  - Attributes: s3.HeadObjectOutput
 //  - CopyOptions.BeforeCopy: *s3.CopyObjectInput
 //  - WriterOptions.BeforeWrite: *s3manager.UploadInput
+//  - SignedURLOptions.BeforeSign: *s3.GetObjectInput, *s3.PutObjectInput or *s3.DeleteObjectInput
+//      when Options.Method == "GET", "PUT" or "DELETE" respectfully
 package s3blob // import "gocloud.dev/blob/s3blob"
 
 import (
@@ -70,6 +72,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/client"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/google/wire"
@@ -720,30 +723,69 @@ func (b *bucket) Delete(ctx context.Context, key string) error {
 
 func (b *bucket) SignedURL(ctx context.Context, key string, opts *driver.SignedURLOptions) (string, error) {
 	key = escapeKey(key)
+	var req *request.Request
 	switch opts.Method {
 	case http.MethodGet:
 		in := &s3.GetObjectInput{
 			Bucket: aws.String(b.name),
 			Key:    aws.String(key),
 		}
-		req, _ := b.client.GetObjectRequest(in)
-		return req.Presign(opts.Expiry)
+		if opts.BeforeSign != nil {
+			asFunc := func(i interface{}) bool {
+				switch v := i.(type) {
+				case **s3.GetObjectInput:
+					*v = in
+					return true
+				}
+				return false
+			}
+			if err := opts.BeforeSign(asFunc); err != nil {
+				return "", err
+			}
+		}
+		req, _ = b.client.GetObjectRequest(in)
 	case http.MethodPut:
 		in := &s3.PutObjectInput{
 			Bucket:      aws.String(b.name),
 			Key:         aws.String(key),
 			ContentType: aws.String(opts.ContentType),
 		}
-		req, _ := b.client.PutObjectRequest(in)
-		return req.Presign(opts.Expiry)
+		if opts.BeforeSign != nil {
+			asFunc := func(i interface{}) bool {
+				switch v := i.(type) {
+				case **s3.PutObjectInput:
+					*v = in
+					return true
+				}
+				return false
+			}
+			if err := opts.BeforeSign(asFunc); err != nil {
+				return "", err
+			}
+		}
+		req, _ = b.client.PutObjectRequest(in)
 	case http.MethodDelete:
 		in := &s3.DeleteObjectInput{
 			Bucket: aws.String(b.name),
 			Key:    aws.String(key),
 		}
-		req, _ := b.client.DeleteObjectRequest(in)
-		return req.Presign(opts.Expiry)
+		if opts.BeforeSign != nil {
+			asFunc := func(i interface{}) bool {
+				switch v := i.(type) {
+				case **s3.DeleteObjectInput:
+					*v = in
+					return true
+				}
+				return false
+			}
+			if err := opts.BeforeSign(asFunc); err != nil {
+				return "", err
+			}
+		}
+		req, _ = b.client.DeleteObjectRequest(in)
 	default:
 		return "", fmt.Errorf("unsupported Method %q", opts.Method)
 	}
+	req.SetContext(ctx)
+	return req.Presign(opts.Expiry)
 }

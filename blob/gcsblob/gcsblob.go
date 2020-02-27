@@ -607,6 +607,19 @@ func (b *bucket) SignedURL(ctx context.Context, key string, dopts *driver.Signed
 		PrivateKey:     b.opts.PrivateKey,
 		SignBytes:      b.opts.SignBytes,
 	}
+	if dopts.BeforeSign != nil {
+		asFunc := func(i interface{}) bool {
+			switch v := i.(type) {
+			case **storage.SignedURLOptions:
+				*v = opts
+				return true
+			}
+			return false
+		}
+		if err := dopts.BeforeSign(asFunc); err != nil {
+			return "", err
+		}
+	}
 	return storage.SignedURL(b.name, key, opts)
 }
 

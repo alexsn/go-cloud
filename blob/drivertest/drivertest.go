@@ -2055,7 +2055,7 @@ func testSignedURL(t *testing.T, newHarness HarnessMaker) {
 		t.Error("got nil error, expected error for negative SignedURLOptions.Expiry")
 	}
 
-	// Generate real signed URLs for GET, GET with the query params remvoed, PUT, and DELETE.
+	// Generate real signed URLs for GET, GET with the query params removed, PUT, and DELETE.
 	getURL, err := b.SignedURL(ctx, key, nil)
 	if err != nil {
 		if gcerrors.Code(err) == gcerrors.Unimplemented {
